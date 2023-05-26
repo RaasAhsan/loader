@@ -1,4 +1,4 @@
-use std::{env, fs::File, os::fd::AsRawFd};
+use std::{fs::File, os::fd::AsRawFd};
 
 use elf::elf64::{self, header::ProgramHeader};
 use memmap2::MmapOptions;
@@ -11,7 +11,7 @@ fn main() {
 
     // let path = &args[1];
 
-    let file = File::open("./examples/a.out").expect("failed to open executable");
+    let file = File::open("./examples/hello").expect("failed to open executable");
 
     let mmap =
         unsafe { MmapOptions::new().map(&file) }.expect("failed to map executable into memory");
@@ -50,6 +50,8 @@ fn main() {
     let entrypoint = headers.header.e_entry;
     println!("Jumping to entrypoint {:08x}", entrypoint);
 
+    println!("--- PROGRAM EXECUTION ---");
+
     // let byte = unsafe { *(0x400000 as *const u8) };
     // println!("{:02x}", byte);
 
@@ -84,7 +86,7 @@ fn initialize_mapping(base: u64, length: usize) {
         libc::mmap(
             base as *mut libc::c_void,
             length as libc::size_t,
-            libc::PROT_NONE,
+            libc::PROT_WRITE | libc::PROT_READ, // TODO: this is a hack because memsize/filesize differences
             libc::MAP_FIXED_NOREPLACE | libc::MAP_ANONYMOUS | libc::MAP_PRIVATE,
             -1,
             0,
@@ -102,7 +104,10 @@ fn load_segments(file: &File, hdrs: &[&ProgramHeader]) {
     for hdr in hdrs.iter() {
         let addr = hdr.p_vaddr;
         let aligned_addr = addr & !0xfff;
-        let length = hdr.p_filesz + (addr - aligned_addr);
+        let file_size = hdr.p_filesz;
+        let mem_size = hdr.p_memsz;
+
+        let length = file_size + (addr - aligned_addr);
         let h_flags = hdr.p_flags;
         let h_offset = (hdr.p_offset & !0xfff) as i64;
 
@@ -123,7 +128,7 @@ fn load_segments(file: &File, hdrs: &[&ProgramHeader]) {
             libc::mmap(
                 aligned_addr as *mut libc::c_void,
                 length as libc::size_t,
-                prot,
+                libc::PROT_EXEC | libc::PROT_WRITE | libc::PROT_READ, // TODO: this is a hack because of permissioning
                 libc::MAP_FIXED | libc::MAP_PRIVATE,
                 file.as_raw_fd(),
                 h_offset,
@@ -135,6 +140,8 @@ fn load_segments(file: &File, hdrs: &[&ProgramHeader]) {
                 *libc::__errno_location()
             });
         }
+
+        if file_size < mem_size {}
 
         println!(
             "Mapped {:08x}:{:08x} to {:08x}-{:08x} with prot {:?}",

@@ -1,4 +1,4 @@
-{	
+{
     "name": "Rust",
     "image": "mcr.microsoft.com/devcontainers/rust:1-bullseye"
 }
