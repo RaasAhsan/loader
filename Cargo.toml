@@ -6,3 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+elf = { git = "https://github.com/RaasAhsan/elf.git", branch = "master" }
+libc = "0.2.144"
+memmap2 = "0.6.1"
