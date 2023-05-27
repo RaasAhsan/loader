@@ -11,7 +11,7 @@ fn main() {
 
     // let path = &args[1];
 
-    let file = File::open("./examples/a.out-2").expect("failed to open executable");
+    let file = File::open("./examples/static-no-pie/a.out").expect("failed to open executable");
 
     let mmap =
         unsafe { MmapOptions::new().map(&file) }.expect("failed to map executable into memory");
@@ -45,40 +45,28 @@ fn main() {
     initialize_mapping(base, size);
     load_segments(&file, &loadable_hdrs);
 
-    // println!("{:?}", alloc.as_range());
-
     let entrypoint = headers.header.e_entry;
-    println!("Jumping to entrypoint {:08x}", entrypoint);
 
-    // let sp = initialize_stack();
+    unsafe { jump(entrypoint) };
 
-    unsafe { push_args(0, 0, std::ptr::null()) };
-
-    // let byte = unsafe { *(0x400000 as *const u8) };
-    // println!("{:02x}", byte);
-
-    // let start: fn() -> () = unsafe { std::mem::transmute(entrypoint as *const u8) };
-    // start();
-
-    unsafe { pop_args() };
+    panic!("unexpected return");
 }
 
-// const args:
-
-unsafe fn push_args(sp: u64, argc: isize, argv: *const *const u8) {
+unsafe fn jump(entrypoint: u64) {
     asm!(
-        "sub sp, sp, #32",
-        "mov x0, #0",
-        "str x0, [sp]",
-        "str x0, [sp, #8]",
-        "str x0, [sp, #16]",
-        "movz x0, #0x0040, lsl #16",
-        "movk x0, #0x05d0",
+        // "sub sp, sp, #32",
+        // "mov x0, #0",
+        // "str x0, [sp]",
+        // "str x0, [sp, #8]",
+        // "str x0, [sp, #16]",
+        "mov x0, {}",
         "br x0",
+        in(reg) entrypoint,
         // in(reg) sp,
         // in(reg) argc,
         // in(reg) argv,
-        options(nomem, nostack)
+        options(noreturn)
+        // options(nomem, nostack)
     );
 }
 
