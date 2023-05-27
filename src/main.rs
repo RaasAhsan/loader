@@ -1,4 +1,4 @@
-use std::{fs::File, os::fd::AsRawFd};
+use std::{arch::asm, fs::File, os::fd::AsRawFd};
 
 use elf::elf64::{self, header::ProgramHeader};
 use memmap2::MmapOptions;
@@ -11,7 +11,7 @@ fn main() {
 
     // let path = &args[1];
 
-    let file = File::open("./examples/hello").expect("failed to open executable");
+    let file = File::open("./examples/a.out-2").expect("failed to open executable");
 
     let mmap =
         unsafe { MmapOptions::new().map(&file) }.expect("failed to map executable into memory");
@@ -50,13 +50,40 @@ fn main() {
     let entrypoint = headers.header.e_entry;
     println!("Jumping to entrypoint {:08x}", entrypoint);
 
-    println!("--- PROGRAM EXECUTION ---");
+    // let sp = initialize_stack();
+
+    unsafe { push_args(0, 0, std::ptr::null()) };
 
     // let byte = unsafe { *(0x400000 as *const u8) };
     // println!("{:02x}", byte);
 
-    let start: fn() -> () = unsafe { std::mem::transmute(entrypoint as *const u8) };
-    start();
+    // let start: fn() -> () = unsafe { std::mem::transmute(entrypoint as *const u8) };
+    // start();
+
+    unsafe { pop_args() };
+}
+
+// const args:
+
+unsafe fn push_args(sp: u64, argc: isize, argv: *const *const u8) {
+    asm!(
+        "sub sp, sp, #32",
+        "mov x0, #0",
+        "str x0, [sp]",
+        "str x0, [sp, #8]",
+        "str x0, [sp, #16]",
+        "movz x0, #0x0040, lsl #16",
+        "movk x0, #0x05d0",
+        "br x0",
+        // in(reg) sp,
+        // in(reg) argc,
+        // in(reg) argv,
+        options(nomem, nostack)
+    );
+}
+
+unsafe fn pop_args() {
+    asm!("add sp, sp, #32", options(nomem, nostack));
 }
 
 fn get_initial_memory_map(hdrs: &[&ProgramHeader]) -> (u64, usize) {
@@ -98,6 +125,28 @@ fn initialize_mapping(base: u64, length: usize) {
             *libc::__errno_location()
         });
     }
+}
+
+fn initialize_stack() -> u64 {
+    let size: usize = 2 * 1024 * 1024;
+    let mapped_addr = unsafe {
+        libc::mmap(
+            std::ptr::null_mut::<libc::c_void>(),
+            size as libc::size_t,
+            libc::PROT_WRITE | libc::PROT_READ,
+            libc::MAP_ANONYMOUS | libc::MAP_PRIVATE,
+            -1,
+            0,
+        )
+    };
+
+    if mapped_addr == libc::MAP_FAILED {
+        panic!("failed to map segment {}", unsafe {
+            *libc::__errno_location()
+        });
+    }
+
+    mapped_addr as u64 + size as u64
 }
 
 fn load_segments(file: &File, hdrs: &[&ProgramHeader]) {
