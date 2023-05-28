@@ -65,13 +65,9 @@ unsafe fn jump(entrypoint: u64) {
         // in(reg) sp,
         // in(reg) argc,
         // in(reg) argv,
-        options(noreturn)
+        options(noreturn, nomem, nostack)
         // options(nomem, nostack)
     );
-}
-
-unsafe fn pop_args() {
-    asm!("add sp, sp, #32", options(nomem, nostack));
 }
 
 fn get_initial_memory_map(hdrs: &[&ProgramHeader]) -> (u64, usize) {
